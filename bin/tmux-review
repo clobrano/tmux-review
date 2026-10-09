@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+plugin_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+pane="${1:-$(tmux display -p '#{pane_id}')}"
+root="${XDG_STATE_HOME:-$HOME/.local/state}/tmux-review"
+[ -d "$root/.git" ] || git init -q "$root"
+find "$root" -maxdepth 1 -name '*.log' -mtime +7 -delete
+find "$root" -maxdepth 1 -name '*.ansi' -mtime +7 -delete
+f="$root/pane${pane#%}-$(date +%s).log"
+raw="$f.ansi"
+trap 'rm -f "$raw"' EXIT
+tmux capture-pane -p -e -J -S - -t "$pane" > "$raw"
+: > "$f"
+cd "$root"
+TMUX_REVIEW_PANE="$pane" TMUX_REVIEW_ANSI="$raw" TMUX_REVIEW_PLUGIN_ROOT="$plugin_root" nvim \
+  --cmd 'lua vim.opt.rtp:prepend(vim.env.TMUX_REVIEW_PLUGIN_ROOT)' \
+  -c 'setlocal ft=tmuxreview' \
+  -c 'lua require("tmux_ansi").apply(0, vim.env.TMUX_REVIEW_ANSI)' \
+  -c 'setlocal nomodifiable' "$f"
