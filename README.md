@@ -77,12 +77,6 @@ return {
     local pane = vim.env.TMUX_REVIEW_PANE
 
     require("review").setup({
-      comment_types = {
-        note = { key = "q", name = "Question", icon = "🙋", hl = "DiagnosticInfo" },
-        suggestion = { key = "a", name = "Action", icon = "💡", hl = "DiagnosticHint" },
-        issue = { key = "i", name = "Issue", icon = "⚠️", hl = "DiagnosticError" },
-        praise = { key = "p", name = "Praise", icon = "✨", hl = "DiagnosticOk" },
-      },
       export = {
         clipboard = pane == nil,
         on_export = function(_, comments)
