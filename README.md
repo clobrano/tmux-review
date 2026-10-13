@@ -62,47 +62,13 @@ The helper stores plain-text review logs under `$XDG_STATE_HOME/tmux-review`, or
 
 ## Optional: add annotations with Review.nvim
 
-Install Review.nvim separately. Add a Review.nvim spec to your Neovim config and use a setup like this:
+Install Review.nvim separately. Keep your existing setup and add this call after `require("review").setup(...)` in its `config` function:
 
 ~~~lua
-return {
-  "georgeguimaraes/review.nvim",
-  version = "*",
-  dependencies = {
-    "esmuellert/codediff.nvim",
-    "MunifTanjim/nui.nvim",
-  },
-  event = "VeryLazy",
-  config = function()
-    local pane = vim.env.TMUX_REVIEW_PANE
-
-    require("review").setup({
-      export = {
-        clipboard = pane == nil,
-        on_export = function(_, comments)
-          local feedback = {
-            "Feedback on the previous output. Use each comment and its source location.",
-            "",
-          }
-
-          local labels = { note = "QUESTION", suggestion = "ACTION" }
-          for i, comment in ipairs(comments) do
-            local label = labels[comment.type] or comment.type:upper()
-            table.insert(feedback, ("%d. **[%s]** %s"):format(i, label, comment.text))
-            table.insert(feedback, ("   Source file: %s:%d"):format(comment.file, comment.line))
-          end
-
-          local output = table.concat(feedback, "\n")
-          vim.fn.setreg("+", output)
-          if pane == nil then vim.fn.setreg("*", output) end
-        end,
-      },
-    })
-  end,
-}
+require("tmux_review").configure_tmux_review()
 ~~~
 
-The launcher sets `TMUX_REVIEW_PANE` while running in the popup. The example uses it to copy exported comments to the system clipboard.
+The launcher sets `TMUX_REVIEW_PANE` while running in the popup. In that popup, press `<leader>rt` to paste the comments into the originating pane and close Neovim. Each comment includes its absolute source path and quoted source excerpt, matching the custom review prompt. The text stays in the agent prompt for you to review and submit. Your existing export key, export callback, and preferences remain in effect.
 
 ## Supported ANSI styles
 
