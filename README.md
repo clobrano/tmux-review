@@ -78,10 +78,11 @@ The renderer supports standard and bright colors, 256-color and RGB foreground/b
 
 ## Record the demo
 
-The demo GIF is generated with [VHS](https://github.com/charmbracelet/vhs). With `vhs`, `ttyd`, `ffmpeg`, tmux and Neovim installed, run from the repository root:
+The demo GIF is generated with [VHS](https://github.com/charmbracelet/vhs). With `vhs`, `ttyd`, `ffmpeg`, git, tmux and Neovim installed, run from the repository root:
 
 ~~~sh
+./demo/setup.sh   # clones Review.nvim and its dependencies into demo/.plugins
 vhs demo/demo.tape
 ~~~
 
-The tape starts a separate tmux server (`tmux -L tmux-review-demo`) with `demo/tmux.conf`, prints `demo/sample-output.sh`, opens the review popup and writes `demo/tmux-review.gif`. Review logs go to a temporary `XDG_STATE_HOME`. Neovim still loads your own config.
+The tape starts a separate tmux server (`tmux -L tmux-review-demo`) with `demo/tmux.conf`. It shows the setup, runs a fake agent (`demo/fake-agent.sh`), opens the review popup, adds two Review.nvim comments and pastes them into the agent prompt with `<leader>rt`. Neovim uses `demo/config/nvim/init.lua`, which loads Review.nvim and shows the typed keys in a corner window. The tmux status line shows `Ctrl-b` while the prefix is active. Review logs and comments go to temporary directories. The tape writes `demo/tmux-review.gif`.
