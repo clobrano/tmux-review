@@ -2,6 +2,8 @@
 
 Review the current tmux pane in Neovim while keeping its ANSI colors and text styles visible. The package captures pane output, writes a plain-text review log, and applies highlights in Neovim.
 
+![tmux-review demo](demo/tmux-review.gif)
+
 The package contains:
 
 - `bin/tmux-review`: captures the pane and opens the review buffer.
@@ -73,3 +75,13 @@ The launcher sets `TMUX_REVIEW_PANE` while running in the popup. In that popup, 
 ## Supported ANSI styles
 
 The renderer supports standard and bright colors, 256-color and RGB foreground/background colors, bold, italic, underline, reverse, and strikethrough.
+
+## Record the demo
+
+The demo GIF is generated with [VHS](https://github.com/charmbracelet/vhs). With `vhs`, `ttyd`, `ffmpeg`, tmux and Neovim installed, run from the repository root:
+
+~~~sh
+vhs demo/demo.tape
+~~~
+
+The tape starts a separate tmux server (`tmux -L tmux-review-demo`) with `demo/tmux.conf`, prints `demo/sample-output.sh`, opens the review popup and writes `demo/tmux-review.gif`. Review logs go to a temporary `XDG_STATE_HOME`. Neovim still loads your own config.
