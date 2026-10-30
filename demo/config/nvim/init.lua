@@ -25,7 +25,7 @@ require("tmux_review").configure_tmux_review()
 -- Key display for the recording: shows the keys typed outside insert mode and what they do.
 local captions = {
   ["<leader> r n"] = "Review.nvim: comment on the selection",
-  ["<leader> r t"] = "tmux-review: paste comments into the agent pane",
+  ["<leader> r t"] = "tmux-review: send review comments to a pane",
   ["Tab"] = "Review.nvim: switch the comment type",
   ["Esc Enter"] = "Review.nvim: save the comment",
   ["V j"] = "select lines",

@@ -17,7 +17,7 @@ Set TypingSpeed 60ms
 
 # Start an isolated tmux server with the demo configs, so yours stay untouched.
 Hide
-Type "export TMUX_REVIEW_ROOT=$PWD XDG_CONFIG_HOME=$PWD/demo/config XDG_STATE_HOME=$(mktemp -d) XDG_DATA_HOME=$(mktemp -d)" Enter
+Type "export TMUX_REVIEW_ROOT=$PWD XDG_CONFIG_HOME=$PWD/demo/config XDG_STATE_HOME=$(mktemp -d) XDG_DATA_HOME=$(mktemp -d) VISUAL=nvim" Enter
 Type "tmux -L tmux-review-demo kill-server 2>/dev/null; tmux -L tmux-review-demo -f demo/tmux.conf new-session -s demo" Enter
 Sleep 1s
 Type "clear; ./demo/intro.sh" Enter
@@ -34,7 +34,61 @@ Sleep 500ms
 Show
 Sleep 3s
 
-# prefix + r opens the pane in Neovim, colors included.
+# prefix + a opens another agent split.
+Ctrl+b
+Sleep 1s
+Type "a"
+Sleep 2s
+
+# Select the left pane, then enter copy mode.
+Ctrl+b
+Sleep 300ms
+Type "q"
+Sleep 500ms
+Type "0"
+Sleep 500ms
+Ctrl+b
+Sleep 300ms
+Type "["
+Sleep 500ms
+
+# Select the failing assertions and add a note from tmux.
+Type "/keeps"
+Sleep 300ms
+Enter
+Sleep 800ms
+Type "Vj"
+Sleep 1s
+Ctrl+b
+Sleep 1s
+Type "c"
+Sleep 2.5s
+
+# Write the note below the quoted selection.
+Type "G"
+Sleep 300ms
+Type "o"
+Sleep 300ms
+Type "Please check the partial reset path."
+Sleep 800ms
+Escape
+Sleep 300ms
+Type ":wq"
+Sleep 300ms
+Enter
+Sleep 2s
+
+# Choose the right pane, then return to the left pane.
+Type "1"
+Sleep 2s
+Ctrl+b
+Sleep 300ms
+Type "q"
+Sleep 500ms
+Type "0"
+Sleep 500ms
+
+# prefix + r opens the pane in Neovim with its ANSI colors.
 Ctrl+b
 Sleep 1s
 Type "r"
@@ -72,8 +126,12 @@ Sleep 300ms
 Enter
 Sleep 2s
 
-# <leader>rt pastes the comments, with the quoted lines, into the agent prompt.
+# <leader>rt pastes the comments, with the quoted lines, into the right pane.
 Type " rt"
+Sleep 1.5s
+Enter
+Sleep 500ms
+Enter
 Sleep 4s
 
 Hide

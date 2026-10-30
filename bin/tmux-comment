@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pane=${1:?}
+window_panes=${2:-1}
+editor_setting=${VISUAL:-${EDITOR:-vi}}
+editor_command=()
+if command -v "$editor_setting" >/dev/null 2>&1; then
+  editor_command=("$editor_setting")
+else
+  # shortcut: Editor options split on whitespace, use a wrapper when an argument contains spaces.
+  read -r -a editor_command <<< "$editor_setting"
+fi
+if ((${#editor_command[@]} == 0)); then
+  printf 'tmux-review: VISUAL or EDITOR must name an executable\n' >&2
+  exit 2
+fi
+
+input=$(mktemp)
+note=$(mktemp)
+channel="tmux-review-comment-$$"
+trap 'rm -f "$input" "$note"' EXIT
+
+cat > "$input"
+tmux copy-mode -q -t "$pane"
+
+{
+  sed 's/^/> /' "$input"
+  printf '\n\n'
+} > "$note"
+
+editor_cmd=$(printf '%q ' "${editor_command[@]}" "$note")
+
+if (( window_panes == 1 )); then
+  tmux split-window -v -l 40% -t "$pane" "$editor_cmd; tmux wait-for -S $channel"
+  tmux wait-for "$channel"
+else
+  tmux display-popup -E -w 80% -h 80% -t "$pane" "$editor_cmd"
+fi
+
+if (( window_panes > 1 )); then
+  tmux display-panes -d 0
+fi
+
+target=$(tmux display -p '#{pane_id}')
+tmux load-buffer -b tmux-review-comment "$note"
+tmux paste-buffer -p -r -d -b tmux-review-comment -t "$target"

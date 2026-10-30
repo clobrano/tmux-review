@@ -2,18 +2,75 @@
 set -euo pipefail
 plugin_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 pane="${1:-$(tmux display -p '#{pane_id}')}"
+editor_setting="${VISUAL:-${EDITOR:-vi}}"
+editor_command=()
+if command -v "$editor_setting" >/dev/null 2>&1; then
+  editor_command=("$editor_setting")
+else
+  # shortcut: Editor options split on whitespace, use a wrapper when an argument contains spaces.
+  read -r -a editor_command <<< "$editor_setting"
+fi
+if ((${#editor_command[@]} == 0)); then
+  printf 'tmux-review: VISUAL or EDITOR must name an executable\n' >&2
+  exit 2
+fi
+editor="${editor_command[0]}"
 root="${XDG_STATE_HOME:-$HOME/.local/state}/tmux-review"
-[ -d "$root/.git" ] || git init -q "$root"
+mkdir -p "$root"
+if [[ "${editor##*/}" == nvim ]] && command -v git >/dev/null 2>&1; then
+  [ -d "$root/.git" ] || git init -q "$root"
+fi
 find "$root" -maxdepth 1 -name '*.log' -mtime +7 -delete
 find "$root" -maxdepth 1 -name '*.ansi' -mtime +7 -delete
 f="$root/pane${pane#%}-$(date +%s).log"
-raw="$f.ansi"
-trap 'rm -f "$raw"' EXIT
-tmux capture-pane -p -e -J -S - -t "$pane" > "$raw"
-: > "$f"
 cd "$root"
-TMUX_REVIEW_PANE="$pane" TMUX_REVIEW_ANSI="$raw" TMUX_REVIEW_PLUGIN_ROOT="$plugin_root" nvim \
-  --cmd 'lua vim.opt.rtp:prepend(vim.env.TMUX_REVIEW_PLUGIN_ROOT)' \
-  -c 'setlocal ft=tmuxreview' \
-  -c 'lua require("tmux_ansi").apply(0, vim.env.TMUX_REVIEW_ANSI)' \
-  -c 'setlocal nomodifiable' "$f"
+case "${editor##*/}" in
+  nvim)
+    raw="$f.ansi"
+    trap 'rm -f "$raw"' EXIT
+    tmux capture-pane -p -e -J -S - -t "$pane" > "$raw"
+    : > "$f"
+    TMUX_REVIEW_PANE="$pane" TMUX_REVIEW_ANSI="$raw" TMUX_REVIEW_PLUGIN_ROOT="$plugin_root" "${editor_command[@]}" \
+      --cmd 'lua vim.opt.rtp:prepend(vim.env.TMUX_REVIEW_PLUGIN_ROOT)' \
+      -c 'setlocal ft=tmuxreview' \
+      -c 'lua require("tmux_ansi").apply(0, vim.env.TMUX_REVIEW_ANSI)' \
+      -c 'setlocal nomodifiable' "$f"
+    ;;
+  *)
+    capture=$(mktemp "$root/.capture.XXXXXX")
+    notes=$(mktemp "$root/.comments.XXXXXX")
+    trap 'rm -f "$capture" "$notes"' EXIT
+    tmux capture-pane -p -J -S - -t "$pane" > "$capture"
+    {
+      printf '%s\n\n%s\n' '# Write below your comments. Only this section is sent to the selected pane.' '------'
+      cat "$capture"
+    } > "$f"
+    TMUX_REVIEW_PANE="$pane" "${editor_command[@]}" "$f"
+    # shortcut: A line containing only six dashes ends the notes, use a unique marker if comments need that text.
+    if ! awk '
+      $0 == "# Write below your comments. Only this section is sent to the selected pane." { in_comments = 1; next }
+      in_comments && $0 == "------" { found = 1; exit }
+      in_comments { lines[++count] = $0 }
+      END {
+        if (!found) exit 2
+        first = 1
+        while (first <= count && lines[first] ~ /^[[:space:]]*$/) first++
+        while (count >= first && lines[count] ~ /^[[:space:]]*$/) count--
+        for (i = first; i <= count; i++) print lines[i]
+      }
+    ' "$f" > "$notes"; then
+      tmux display-message 'tmux-review: comment section markers missing; nothing sent'
+      exit 1
+    fi
+    if [[ -s "$notes" ]]; then
+      window_panes="$(tmux display -p -t "$pane" '#{window_panes}')"
+      target="$pane"
+      if (( window_panes > 1 )); then
+        tmux display-panes -d 0
+        target="$(tmux display -p '#{pane_id}')"
+      fi
+      tmux load-buffer -b "tmux-review-comments-$$" "$notes"
+      tmux paste-buffer -p -r -d -b "tmux-review-comments-$$" -t "$target"
+    fi
+    ;;
+esac

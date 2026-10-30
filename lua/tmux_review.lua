@@ -65,10 +65,15 @@ end
 local function format_comments(comments)
   local markdown = {
     "Feedback on your previous output. Review each comment with its quoted context.",
-    "Reply to QUESTION comments without changing code. Make changes for ACTION or ISSUE comments. Treat PRAISE as positive feedback.",
+    "Reply to QUESTION comments without changing code. Strictly follow the request with ACTION or ISSUE comments. Treat NOTE comments as context.",
     "",
   }
-  local type_labels = { note = "QUESTION", suggestion = "ACTION" }
+  local type_labels = {
+    note = "NOTE",
+    suggestion = "ACTION",
+    issue = "ISSUE",
+    praise = "QUESTION",
+  }
 
   for i, comment in ipairs(comments or {}) do
     local type_name = type_labels[comment.type] or comment.type:upper()
@@ -79,6 +84,77 @@ local function format_comments(comments)
   end
 
   return table.concat(markdown, "\n")
+end
+
+local function list_panes_in_window(source)
+  local lines = vim.fn.systemlist({
+    "tmux", "list-panes", "-a", "-F",
+    "#{pane_id}\t#{window_id}\t#{pane_index}\t#{pane_left}\t#{pane_current_command}",
+  })
+  if vim.v.shell_error ~= 0 then
+    notify("Could not list tmux panes: " .. table.concat(lines, "\n"), vim.log.levels.ERROR)
+    return nil
+  end
+
+  local panes, source_window = {}, nil
+  for _, line in ipairs(lines) do
+    local id, window_id, index, left, command = line:match("^([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t(.*)$")
+    if id then
+      local target = {
+        id = id,
+        window_id = window_id,
+        index = tonumber(index),
+        left = tonumber(left),
+        command = command,
+      }
+      table.insert(panes, target)
+      if id == source then source_window = window_id end
+    end
+  end
+
+  if not source_window then
+    notify("Could not find the review pane in tmux", vim.log.levels.ERROR)
+    return nil
+  end
+
+  local same_window = {}
+  for _, target in ipairs(panes) do
+    if target.window_id == source_window then table.insert(same_window, target) end
+  end
+  return same_window
+end
+
+local function choose_target(panes, source, on_choice)
+  if #panes == 1 then
+    on_choice(panes[1])
+    return
+  end
+
+  if #panes == 2 then
+    local left_target, right_target = panes[1], panes[2]
+    if left_target.left > right_target.left then
+      left_target, right_target = right_target, left_target
+    end
+
+    local choice = vim.fn.confirm("Send review context to:", "&left\n&right", 2)
+    if choice == 1 then
+      on_choice(left_target)
+    elseif choice == 2 then
+      on_choice(right_target)
+    end
+    return
+  end
+
+  vim.ui.select(panes, {
+    prompt = "Send review context to:",
+    format_item = function(target)
+      if target.id == source then return "source" end
+      local command = target.command ~= "" and target.command or "unknown"
+      return ("other pane %d (%s)"):format(target.index, command)
+    end,
+  }, function(target)
+    if target then on_choice(target) end
+  end)
 end
 
 function M.configure_tmux_review()
@@ -104,10 +180,16 @@ function M.configure_tmux_review()
       end
     end
 
-    if send_to_pane and paste_to_pane(pane, format_comments(comments)) then
-      vim.schedule(function()
-        local close_ok, close_err = pcall(vim.cmd, "qa")
-        if not close_ok then notify(close_err, vim.log.levels.ERROR) end
+    if send_to_pane then
+      local panes = list_panes_in_window(pane)
+      if not panes then return end
+      choose_target(panes, pane, function(target)
+        if paste_to_pane(target.id, format_comments(comments)) then
+          vim.schedule(function()
+            local close_ok, close_err = pcall(vim.cmd, "qa")
+            if not close_ok then notify(close_err, vim.log.levels.ERROR) end
+          end)
+        end
       end)
     end
   end
@@ -117,7 +199,7 @@ function M.configure_tmux_review()
     local export_ok, err = pcall(function() require("review").export() end)
     send_to_pane = false
     if not export_ok then notify(err, vim.log.levels.ERROR) end
-  end, { desc = "Export review and return to tmux prompt" })
+  end, { desc = "Choose pane and send review to tmux" })
 
   configured = true
 end
