@@ -38,10 +38,10 @@ else
   tmux display-popup -E -w 80% -h 80% -t "$pane" "$editor_cmd"
 fi
 
-if (( window_panes > 1 )); then
-  tmux display-panes -d 0
-fi
-
-target=$(tmux display -p '#{pane_id}')
 tmux load-buffer -b tmux-review-comment "$note"
-tmux paste-buffer -p -r -d -b tmux-review-comment -t "$target"
+if (( window_panes > 1 )); then
+  tmux display-panes -d 0 "paste-buffer -p -r -d -b tmux-review-comment -t '%%'"
+else
+  target=$(tmux display -p '#{pane_id}')
+  tmux paste-buffer -p -r -d -b tmux-review-comment -t "$target"
+fi
